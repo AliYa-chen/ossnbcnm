@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue'
 
+const BASE_URL = window.location.origin
+
 /**
  * 扫描 public/assets
  */
@@ -43,7 +45,7 @@ const resources = computed(() => {
     res[type].push({
       name,
       url,        // 👉 已经是 /assets/xxx
-      fullUrl: url // 👉 public 下不需要 BASE_URL 拼接
+      fullUrl: BASE_URL + url // 👉 public 下不需要 BASE_URL 拼接
     })
   })
 
