@@ -38,10 +38,10 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 Create a `.env` file in the root directory and add the following environment variables:
 
 ```env
-owner = your-github-username
-repo = your-github-repo
-branch = your-github-branch
-token = your-github-token
+OWNER = your-github-username
+REPO = your-github-repo
+BRANCH = your-github-branch
+GITHUB_TOKEN = your-github-token
 ```
 
 GitHub Tokens: You can create a personal access token in your GitHub account settings. Ensure you grant the necessary repository access permissions. We recommend selecting "Fine-grained tokens," then choosing `"Actions"`,`"Contents"`, `"Metadata"`, `"Workflows"` and granting read and write permissions.
