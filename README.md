@@ -44,6 +44,8 @@ branch = your-github-branch
 token = your-github-token
 ```
 
+GitHub Tokens: You can create a personal access token in your GitHub account settings. Ensure you grant the necessary repository access permissions. We recommend selecting "Fine-grained tokens," then choosing `"Actions"`,`"Contents"`, `"Metadata"`, `"Workflows"` and granting read and write permissions.
+
 Or refer to this link: [Environment Variables](https://pages.edgeone.ai/document/build-guide#c51018ad-71af-43a6-83af-acbc3690c653),Then use `edgeone pages link` in your project to synchronize your configured environment variables to your local machine.
 
 
