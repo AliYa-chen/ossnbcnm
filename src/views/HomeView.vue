@@ -6,6 +6,10 @@ const BASE_URL = window.location.origin
 const file = ref(null)
 const MAX_SIZE_MB = 25
 
+const uploading = ref(false)
+const buildWaiting = ref(false)
+
+
 /**
  * 扫描 public/assets
  */
@@ -66,27 +70,22 @@ async function upload() {
     return
   }
 
-  // 文件大小限制
   const sizeMB = file.value.size / 1024 / 1024
   if (sizeMB > MAX_SIZE_MB) {
     alert(`文件过大，最大支持 ${MAX_SIZE_MB} MB`)
     return
   }
 
-  // 使用 FileReader 生成 base64
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      // 读取结果是 data:<mime>;base64,<base64>
-      // 我们只取 base64 部分
-      const result = reader.result.split(',')[1]
-      resolve(result)
-    }
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file.value)
-  })
+  uploading.value = true
 
   try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result.split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(file.value)
+    })
+
     const res = await fetch('/api/filepush', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -97,16 +96,27 @@ async function upload() {
     })
 
     const data = await res.json()
-    if (data.content?.path) {
-      alert(`上传成功: ${data.content.path}`)
-    } else {
-      alert(`上传失败: ${data.error || JSON.stringify(data)}`)
+
+    if (!data.content?.path) {
+      throw new Error(data.error || '上传失败')
     }
+
+    // 上传成功 → 切换到编译等待状态
+    uploading.value = false
+    buildWaiting.value = true
+
+    // 20 秒后刷新页面
+    setTimeout(() => {
+      location.reload()
+    }, 20000)
+
   } catch (err) {
     console.error(err)
+    uploading.value = false
     alert('上传失败，请重试')
   }
 }
+
 
 </script>
 
@@ -243,5 +253,33 @@ async function upload() {
     </a>
     提供 CDN 服务
   </footer>
+
+
+  <!-- 全屏上传 Loading -->
+  <div v-if="uploading || buildWaiting" class="fixed inset-0 z-50 flex items-center justify-center
+         bg-black/60 backdrop-blur-sm">
+    <div class="flex flex-col items-center gap-4 rounded-2xl
+           bg-white dark:bg-zinc-900
+           px-8 py-6 shadow-xl">
+      <!-- Spinner -->
+      <svg class="h-10 w-10 animate-spin text-indigo-600" viewBox="0 0 24 24" fill="none">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+
+      <div class="text-center">
+        <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+          {{ uploading ? '正在上传文件…' : '文件已上传' }}
+        </p>
+        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          {{
+            uploading
+              ? '请勿关闭页面'
+              : '正在重新编译资源，请等待约 20 秒'
+          }}
+        </p>
+      </div>
+    </div>
+  </div>
 
 </template>

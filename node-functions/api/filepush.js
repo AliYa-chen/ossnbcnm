@@ -32,19 +32,19 @@ export async function onRequest({ request, env }) {
     return new Response(JSON.stringify({ error: 'File type not allowed' }), { status: 400 })
   }
 
-  const owner = 'AliYa-chen'
-  const repo = 'ossnbcnm'
-  const branch = 'main'
-  const token = env.GITHUB_TOKEN
+  const OWNER = env.OWNER
+  const REPO = env.REPO
+  const BRANCH = env.BRANCH
+  const GITHUB_TOKEN = env.GITHUB_TOKEN
 
   // 最终上传路径
   const path = `public/assets/${folder}/${name}`
-  const api = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`
+  const api = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(path)}`
 
   // 尝试获取 sha（文件存在就更新，不存在就创建）
   let sha
-  const getRes = await fetch(`${api}?ref=${branch}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+  const getRes = await fetch(`${api}?ref=${BRANCH}`, {
+    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
   })
   if (getRes.ok) {
     const data = await getRes.json()
@@ -54,11 +54,11 @@ export async function onRequest({ request, env }) {
   // 提交文件
   const putRes = await fetch(api, {
     method: 'PUT',
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
     body: JSON.stringify({
       message: `upload ${path}`,
       content,
-      branch,
+      BRANCH,
       ...(sha ? { sha } : {}),
     }),
   })
