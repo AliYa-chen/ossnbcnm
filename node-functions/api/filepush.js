@@ -58,7 +58,7 @@ export async function onRequest({ request, env }) {
     body: JSON.stringify({
       message: `upload ${path}`,
       content,
-      BRANCH,
+      branch: BRANCH,
       ...(sha ? { sha } : {}),
     }),
   })
