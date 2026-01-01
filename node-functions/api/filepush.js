@@ -16,6 +16,26 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary)
 }
 
+// ===== 工具：根据文件名获取存储目录 =====
+function getAssetDir(filename) {
+  const ext = filename.split('.').pop().toLowerCase()
+
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) {
+    return 'img'
+  }
+  if (['mp4', 'webm', 'ogg'].includes(ext)) {
+    return 'video'
+  }
+  if (['mp3', 'wav', 'm4a'].includes(ext)) {
+    return 'music'
+  }
+  if (['ttf', 'otf', 'woff', 'woff2'].includes(ext)) {
+    return 'font'
+  }
+  return 'other'
+}
+
+
 export async function onRequest({ request, env }) {
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 })
@@ -74,10 +94,9 @@ export async function onRequest({ request, env }) {
         offset += buf.byteLength
       }
 
-      // ✅ 正确 base64
       const base64 = arrayBufferToBase64(merged.buffer)
 
-      // 3.1 创建 blob
+      // 创建 blob
       const blobRes = await fetch(
         `https://api.github.com/repos/${OWNER}/${REPO}/git/blobs`,
         {
@@ -93,14 +112,16 @@ export async function onRequest({ request, env }) {
         }
       ).then(r => r.json())
 
-      // 3.2 tree 引用 blob sha
+      const dir = getAssetDir(file.name)
+
       tree.push({
-        path: `public/assets/${file.name}`,
+        path: `public/assets/${dir}/${file.name}`,
         mode: '100644',
         type: 'blob',
         sha: blobRes.sha,
       })
     }
+
 
     // 4️⃣ 创建 tree
     const treeRes = await fetch(
