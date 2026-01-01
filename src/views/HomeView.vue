@@ -1,9 +1,14 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { v4 as uuidv4 } from 'uuid'
+
+const uploadSessionId = uuidv4()
+
 
 const BASE_URL = window.location.origin
 
-const file = ref(null)
+const files = ref([]) // 多文件
+
 const MAX_SIZE_MB = 25
 
 const uploading = ref(false)
@@ -85,35 +90,94 @@ async function pollBuildStatus() {
 }
 
 async function upload() {
-  if (!file.value) return alert('请选择文件');
-  if (file.value.size / 1024 / 1024 > MAX_SIZE_MB) return alert(`文件过大，最大支持 ${MAX_SIZE_MB} MB`);
-
   uploading.value = true
-  buildWaiting.value = false
 
-  const MAX_BODY_SIZE = 3 * 1024 * 1024 // 3MB
-  const totalChunks = Math.ceil(file.value.size / MAX_BODY_SIZE)
+  for (const f of files.value) {
+    await uploadSingleFile(f)
+  }
+
+  // ⭐ 关键：告诉后端「可以 commit 了」
+  await fetch('/api/filepush?commit=1', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: uploadSessionId }),
+  })
+
+  await pollBuildStatus()
+  // location.reload()
+}
+
+
+
+
+
+function handleFiles(fileList) {
+  const incoming = Array.from(fileList)
+
+  for (const f of incoming) {
+    if (f.size / 1024 / 1024 > MAX_SIZE_MB) {
+      alert(`文件 ${f.name} 超过 ${MAX_SIZE_MB}MB`)
+      return
+    }
+  }
+
+  // 已有文件
+  const existing = files.value
+
+  // 用 name + size 去重（最稳）
+  const map = new Map()
+
+  for (const f of existing) {
+    map.set(`${f.name}_${f.size}`, f)
+  }
+
+  for (const f of incoming) {
+    map.set(`${f.name}_${f.size}`, f)
+  }
+
+  files.value = Array.from(map.values())
+}
+
+function removeFile(index) {
+  files.value.splice(index, 1)
+}
+
+
+async function uploadSingleFile(file) {
+  const MAX_BODY_SIZE = 3 * 1024 * 1024
+  const totalChunks = Math.ceil(file.size / MAX_BODY_SIZE)
+  const fileId = getFileId(file)
 
   for (let i = 0; i < totalChunks; i++) {
-    const start = i * MAX_BODY_SIZE
-    const end = Math.min(file.value.size, start + MAX_BODY_SIZE)
-    const blob = file.value.slice(start, end)
+    const blob = file.slice(
+      i * MAX_BODY_SIZE,
+      Math.min(file.size, (i + 1) * MAX_BODY_SIZE)
+    )
 
     const formData = new FormData()
-    formData.append('file', blob, file.value.name)
+    formData.append('sessionId', uploadSessionId)
+    formData.append('fileId', fileId)
+    formData.append('fileName', file.name)
+    formData.append('file', blob)
     formData.append('index', i)
     formData.append('total', totalChunks)
 
-    await fetch('/api/filepush', { method: 'POST', body: formData })
+    const res = await fetch('/api/filepush', {
+      method: 'POST',
+      body: formData,
+    })
 
-    console.log(`已上传 ${i + 1}/${totalChunks} 片`)
+    if (!res.ok) {
+      throw new Error(`上传失败：${file.name} 第 ${i + 1} 片`)
+    }
   }
-
-  await pollBuildStatus()
-  alert('资源编译完成！页面即将刷新')
-  location.reload()
 }
 
+
+// 给每个文件生成稳定 fileId
+function getFileId(file) {
+  return `${file.name}_${file.size}_${file.lastModified}`
+}
 
 
 </script>
@@ -156,25 +220,59 @@ async function upload() {
       </a>
     </h1>
     <div class="mb-8">
-      <label for="file-upload"
-        class="flex flex-col items-center justify-center w-full p-6 border-2 border-dashed border-zinc-300 dark:border-zinc-600 rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-zinc-800 transition">
+      <label for="file-upload" class="flex flex-col items-center justify-center w-full p-6
+         border-2 border-dashed rounded-xl cursor-pointer
+         border-zinc-300 dark:border-zinc-600
+         hover:border-indigo-500 hover:bg-indigo-50
+         dark:hover:bg-zinc-800 transition" @dragover.prevent @drop.prevent="e => handleFiles(e.dataTransfer.files)">
         <svg class="w-10 h-10 mb-3 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" stroke-width="2"
           viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4h10v12m-5-5v8"></path>
         </svg>
         <span class="text-sm text-zinc-600 dark:text-zinc-400 mb-2">点击或拖拽文件到此处上传</span>
         <span class="text-xs text-zinc-400 dark:text-zinc-500">支持图片、视频、音频、字体，最大 25MB</span>
-        <input id="file-upload" type="file" class="hidden" @change="e => file = e.target.files[0]" />
+        <input id="file-upload" type="file" multiple class="hidden" @change="e => handleFiles(e.target.files)" />
+
       </label>
 
-      <button @click="upload"
-        class="mt-4 w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white font-semibold shadow hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition">
+      <button @click="upload" :disabled="!files.length || uploading" class="mt-4 w-full sm:w-auto px-4 py-2 rounded-md
+         bg-indigo-600 text-white font-semibold shadow
+         hover:bg-indigo-500
+         disabled:opacity-50 disabled:cursor-not-allowed
+         transition">
         上传文件
       </button>
 
-      <p v-if="file" class="mt-2 text-sm text-zinc-600 dark:text-zinc-400 truncate">
-        当前选择文件: <span class="font-medium">{{ file.name }}</span>
-      </p>
+
+      <!-- 已选择文件列表 -->
+      <div v-if="files.length" class="mt-4 space-y-2">
+        <div v-for="(f, index) in files" :key="f.name + f.size" class="flex items-center justify-between
+           rounded-lg border border-zinc-200 dark:border-zinc-700
+           bg-white dark:bg-zinc-800
+           px-3 py-2 text-sm">
+          <!-- 文件信息 -->
+          <div class="min-w-0">
+            <p class="truncate font-medium text-zinc-800 dark:text-zinc-100">
+              {{ f.name }}
+            </p>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              {{ (f.size / 1024 / 1024).toFixed(2) }} MB
+            </p>
+          </div>
+
+          <!-- 删除按钮 -->
+          <button @click="removeFile(index)" class="ml-3 inline-flex items-center justify-center
+             rounded-md px-2 py-1
+             text-xs font-medium
+             text-red-600 dark:text-red-400
+             hover:bg-red-50 dark:hover:bg-red-900/20
+             transition" title="移除文件">
+            ✕
+          </button>
+        </div>
+      </div>
+
+
     </div>
 
 
