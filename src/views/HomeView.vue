@@ -92,7 +92,7 @@ async function upload() {
   uploading.value = true
   buildWaiting.value = false
 
-  const MAX_BODY_SIZE = 6 * 1024 * 1024 // 6MB
+  const MAX_BODY_SIZE = 3 * 1024 * 1024 // 3MB
   const totalChunks = Math.ceil(file.value.size / MAX_BODY_SIZE)
 
   for (let i = 0; i < totalChunks; i++) {
