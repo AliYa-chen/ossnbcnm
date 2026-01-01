@@ -64,6 +64,32 @@ async function copyLink(url) {
   alert('已复制资源链接')
 }
 
+async function pollBuildStatus(interval = 2000, timeout = 60000) {
+  const start = Date.now()
+
+  return new Promise((resolve, reject) => {
+    const timer = setInterval(async () => {
+      if (Date.now() - start > timeout) {
+        clearInterval(timer)
+        reject(new Error('轮询超时'))
+        return
+      }
+
+      try {
+        const res = await fetch('/api/getstatus')
+        const data = await res.json()
+
+        if (data.usedInProd) {
+          clearInterval(timer)
+          resolve(true)
+        }
+      } catch (err) {
+        console.error('轮询失败', err)
+      }
+    }, interval)
+  })
+}
+
 async function upload() {
   if (!file.value) {
     alert('请选择文件')
@@ -105,17 +131,22 @@ async function upload() {
     uploading.value = false
     buildWaiting.value = true
 
-    // 20 秒后刷新页面
-    setTimeout(() => {
-      location.reload()
-    }, 20000)
+    // 开始轮询
+    await pollBuildStatus(2000, 120000) // 每 2 秒轮询，最多 2 分钟
+
+    // 编译完成 → 刷新页面或提示
+    buildWaiting.value = false
+    alert('资源编译完成！页面即将刷新')
+    location.reload()
 
   } catch (err) {
     console.error(err)
     uploading.value = false
-    alert('上传失败，请重试')
+    buildWaiting.value = false
+    alert('上传或轮询失败，请重试')
   }
 }
+
 
 
 </script>
