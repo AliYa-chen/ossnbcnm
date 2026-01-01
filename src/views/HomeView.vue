@@ -37,9 +37,7 @@ function getType(name) {
   return null
 }
 
-/**
- * 分组资源
- */
+// 分组资源
 const resources = computed(() => {
   const res = { image: [], video: [], audio: [], font: [] }
 
