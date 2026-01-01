@@ -63,6 +63,8 @@ async function copyLink(url) {
 }
 
 async function pollBuildStatus() {
+  buildWaiting.value = true
+  uploading.value = false
   return new Promise((resolve, reject) => {
     const timer = setInterval(async () => {
       try {
@@ -88,44 +90,31 @@ async function upload() {
     return alert(`文件过大，最大支持 ${MAX_SIZE_MB} MB`)
 
   uploading.value = true
-  buildWaiting.value = true
+  buildWaiting.value = false
 
   const MAX_BODY_SIZE = 6 * 1024 * 1024 // 6MB
-  const CHUNK_SIZE = Math.floor(MAX_BODY_SIZE * 3 / 4) // 二进制片大小
-  const totalChunks = Math.ceil(file.value.size / CHUNK_SIZE)
+  const totalChunks = Math.ceil(file.value.size / MAX_BODY_SIZE)
 
   for (let i = 0; i < totalChunks; i++) {
-    const start = i * CHUNK_SIZE
-    const end = Math.min(file.value.size, start + CHUNK_SIZE)
+    const start = i * MAX_BODY_SIZE
+    const end = Math.min(file.value.size, start + MAX_BODY_SIZE)
     const blob = file.value.slice(start, end)
 
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result.split(',')[1])
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
+    const formData = new FormData()
+    formData.append('file', blob, file.value.name)
+    formData.append('index', i)
+    formData.append('total', totalChunks)
 
-    await fetch('/api/filepush', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: file.value.name,
-        content: base64,
-        index: i,
-        total: totalChunks
-      }),
-    })
+    await fetch('/api/filepush', { method: 'POST', body: formData })
 
     console.log(`已上传 ${i + 1}/${totalChunks} 片`)
   }
 
   await pollBuildStatus()
-  buildWaiting.value = false
-  uploading.value = false
   alert('资源编译完成！页面即将刷新')
   location.reload()
 }
+
 
 
 </script>
@@ -279,15 +268,12 @@ async function upload() {
 
       <div class="text-center">
         <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-          {{ uploading ? '正在上传文件…' : '文件已上传' }}
+          {{ uploading ? '正在上传文件…' : buildWaiting ? '文件已上传' : '文件已上传' }}
         </p>
         <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {{
-            uploading
-              ? '请勿关闭页面'
-              : '正在重新编译资源，请等待约 20 秒'
-          }}
+          {{ uploading ? '请勿关闭页面' : buildWaiting ? '正在重新编译资源，请等待约 20 秒' : '' }}
         </p>
+
       </div>
     </div>
   </div>
