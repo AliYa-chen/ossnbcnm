@@ -83,52 +83,53 @@ async function pollBuildStatus() {
 }
 
 async function upload() {
-  if (!file.value) {
-    alert('请选择文件')
-    return
-  }
-
-  const sizeMB = file.value.size / 1024 / 1024
-  if (sizeMB > MAX_SIZE_MB) {
-    alert(`文件过大，最大支持 ${MAX_SIZE_MB} MB`)
-    return
-  }
+  if (!file.value) return alert('请选择文件')
+  if (file.value.size / 1024 / 1024 > MAX_SIZE_MB)
+    return alert(`文件过大，最大支持 ${MAX_SIZE_MB} MB`)
 
   uploading.value = true
+  buildWaiting.value = true
 
-  try {
-    const formData = new FormData()
-    formData.append('file', file.value)
+  const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB 每片
+  const totalChunks = Math.ceil(file.value.size / CHUNK_SIZE)
 
-    const res = await fetch('/api/filepush', {
-      method: 'POST',
-      body: formData,
+  let uploadedChunks = 0
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE
+    const end = Math.min(file.value.size, start + CHUNK_SIZE)
+    const blob = file.value.slice(start, end)
+
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result.split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
     })
 
-    const data = await res.json()
+    await fetch('/api/filepush', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: file.value.name,
+        content: base64,
+        index: i,
+        total: totalChunks
+      }),
+    })
 
-    if (!data.content?.path) {
-      throw new Error(data.error || '上传失败')
-    }
-
-    // 上传成功 → 切换到编译等待状态
-    uploading.value = false
-    buildWaiting.value = true
-
-    // 开始不停轮询
-    await pollBuildStatus()
-
-    buildWaiting.value = false
-    alert('资源编译完成！页面即将刷新')
-    location.reload()
-
-  } catch (err) {
-    console.error(err)
-    uploading.value = false
-    buildWaiting.value = false
-    alert('上传或轮询失败，请重试')
+    uploadedChunks++
+    console.log(`已上传 ${uploadedChunks}/${totalChunks} 片`)
   }
+
+  // 所有分片上传完成 → 开始轮询编译状态
+  await pollBuildStatus()
+  buildWaiting.value = false
+  uploading.value = false
+  alert('资源编译完成！页面即将刷新')
+  location.reload()
 }
+
 
 
 

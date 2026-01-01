@@ -3,74 +3,59 @@ export async function onRequest({ request, env }) {
     return new Response('Method Not Allowed', { status: 405 })
   }
 
-  // 获取文件（FormData 上传）
-  let file, name
+  let body
   try {
-    const formData = await request.formData()
-    const fileField = formData.get('file')
-    if (!fileField) throw new Error('No file uploaded')
-
-    file = await fileField.arrayBuffer() // ArrayBuffer
-    name = fileField.name
-  } catch (e) {
-    return new Response(JSON.stringify({ error: 'Invalid file upload', message: e.message }), { status: 400 })
+    body = await request.json()
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 })
   }
 
-  const TYPES = {
-    image: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'],
-    video: ['mp4', 'webm', 'ogg'],
-    audio: ['mp3', 'wav', 'm4a'],
-    font: ['ttf', 'otf', 'woff', 'woff2'],
+  const { name, content, index, total } = body
+  if (!name || !content || index == null || total == null) {
+    return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400 })
   }
 
-  const ext = name.split('.').pop().toLowerCase()
-  let folder
-  if (TYPES.image.includes(ext)) folder = 'img'
-  else if (TYPES.video.includes(ext)) folder = 'video'
-  else if (TYPES.audio.includes(ext)) folder = 'music'
-  else if (TYPES.font.includes(ext)) folder = 'font'
-  else return new Response(JSON.stringify({ error: 'File type not allowed' }), { status: 400 })
+  // 临时存储分片（Worker 内存或 KV）
+  // 这里示例用全局 Map（实际可用 KV / Durable Object 避免内存问题）
+  if (!globalThis._uploadCache) globalThis._uploadCache = new Map()
+  const arr = globalThis._uploadCache.get(name) || []
+  arr[index] = content
+  globalThis._uploadCache.set(name, arr)
 
-  const OWNER = env.OWNER
-  const REPO = env.REPO
-  const BRANCH = env.BRANCH
-  const GITHUB_TOKEN = env.GITHUB_TOKEN
+  // 如果最后一片上传完成
+  if (arr.filter(Boolean).length === total) {
+    const fullBase64 = arr.join('') // 合并 Base64
 
-  const path = `public/assets/${folder}/${name}`
-  const api = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(path)}`
+    const OWNER = env.OWNER
+    const REPO = env.REPO
+    const BRANCH = env.BRANCH
+    const GITHUB_TOKEN = env.GITHUB_TOKEN
+    const path = `public/assets/${name}`
+    const api = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(path)}`
 
-  // 获取 sha
-  let sha
-  const getRes = await fetch(`${api}?ref=${BRANCH}`, {
-    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
-  })
-  if (getRes.ok) {
-    const data = await getRes.json()
-    sha = data.sha
+    // 获取 sha
+    let sha
+    const getRes = await fetch(`${api}?ref=${BRANCH}`, {
+      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+    })
+    if (getRes.ok) sha = (await getRes.json()).sha
+
+    // PUT 到 GitHub
+    const putRes = await fetch(api, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+      body: JSON.stringify({
+        message: `upload ${path}`,
+        content: fullBase64,
+        branch: BRANCH,
+        ...(sha ? { sha } : {}),
+      }),
+    })
+
+    globalThis._uploadCache.delete(name)
+    const result = await putRes.json()
+    return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } })
   }
 
-  // ArrayBuffer → Base64
-  const uint8 = new Uint8Array(file)
-  const CHUNK_SIZE = 0x8000
-  let base64 = ''
-  for (let i = 0; i < uint8.length; i += CHUNK_SIZE) {
-    const chunk = uint8.subarray(i, i + CHUNK_SIZE)
-    base64 += String.fromCharCode(...chunk)
-  }
-  base64 = btoa(base64)
-
-  // 上传到 GitHub
-  const putRes = await fetch(api, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
-    body: JSON.stringify({
-      message: `upload ${path}`,
-      content: base64,
-      branch: BRANCH,
-      ...(sha ? { sha } : {}),
-    }),
-  })
-
-  const result = await putRes.json()
-  return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } })
+  return new Response(JSON.stringify({ ok: true, index }), { headers: { 'Content-Type': 'application/json' } })
 }
