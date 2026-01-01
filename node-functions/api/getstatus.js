@@ -1,3 +1,4 @@
+// 获取项目状态信息
 export async function onRequest({ request, env }) {
 
   if (request.method !== 'POST') {

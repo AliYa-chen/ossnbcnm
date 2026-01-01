@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
+import GithubStarButton from '@/components/GithubStarButton.vue'
 
 const uploadSessionId = uuidv4()
 
@@ -17,7 +18,18 @@ const buildWaiting = ref(false)
 // 预览图片
 const previewImage = ref(null)
 
+// GitHub Star 数
+const stars = ref('—')
 
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/getstar')
+    const data = await res.json()
+    stars.value = data.stars
+  } catch (e) {
+    stars.value = '—'
+  }
+})
 
 /**
  * 扫描 public/assets
@@ -206,93 +218,99 @@ function showToast(text, duration = 2000) {
               text-zinc-900 dark:text-zinc-100 p-6">
 
     <h1 class="mb-8 text-2xl font-bold">📦 Public Assets 资源浏览
-      <a href="https://github.com/AliYa-chen/EdgeOnePagesCOS" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700
-           bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium
-           hover:bg-zinc-100 dark:hover:bg-zinc-700 transition" title="查看 GitHub 仓库">
-        <!-- GitHub Icon -->
-        <svg class="h-5 w-5 text-zinc-700 dark:text-zinc-200" viewBox="0 0 24 24" fill="currentColor"
-          aria-hidden="true">
-          <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483
-           0-.237-.009-.868-.014-1.703-2.782.605-3.369-1.343-3.369-1.343
-           -.454-1.158-1.11-1.466-1.11-1.466
-           -.908-.62.069-.608.069-.608
-           1.003.07 1.531 1.032 1.531 1.032
-           .892 1.53 2.341 1.088 2.91.832
-           .092-.647.35-1.088.636-1.338
-           -2.22-.253-4.555-1.113-4.555-4.951
-           0-1.093.39-1.988 1.029-2.688
-           -.103-.253-.446-1.272.098-2.65
-           0 0 .84-.27 2.75 1.026
-           .798-.222 1.655-.333 2.505-.337
-           .85.004 1.707.115 2.506.337
-           1.909-1.296 2.747-1.026 2.747-1.026
-           .546 1.378.202 2.397.1 2.65
-           .64.7 1.028 1.595 1.028 2.688
-           0 3.848-2.338 4.695-4.566 4.943
-           .359.309.678.92.678 1.855
-           0 1.338-.012 2.419-.012 2.747
-           0 .268.18.58.688.482
-           A10.019 10.019 0 0022 12.017
-           C22 6.484 17.523 2 12 2z" clip-rule="evenodd" />
-        </svg>
-        GitHub
-      </a>
+      <GithubStarButton repo-url="https://github.com/AliYa-chen/EdgeOnePagesCOS" :stars="stars" />
     </h1>
-    <div class="mb-8">
-      <label for="file-upload" class="flex flex-col items-center justify-center w-full p-6
-         border-2 border-dashed rounded-xl cursor-pointer
-         border-zinc-300 dark:border-zinc-600
-         hover:border-indigo-500 hover:bg-indigo-50
-         dark:hover:bg-zinc-800 transition" @dragover.prevent @drop.prevent="e => handleFiles(e.dataTransfer.files)">
-        <svg class="w-10 h-10 mb-3 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" stroke-width="2"
-          viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4h10v12m-5-5v8"></path>
-        </svg>
-        <span class="text-sm text-zinc-600 dark:text-zinc-400 mb-2">点击或拖拽文件到此处上传</span>
-        <span class="text-xs text-zinc-400 dark:text-zinc-500">支持图片、视频、音频、字体，最大 25MB</span>
-        <input id="file-upload" type="file" multiple class="hidden" @change="e => handleFiles(e.target.files)" />
+    <!-- 文件上传区域 -->
+    <section class="mb-10 pt-7">
+      <div class="mx-auto max-w-xl
+           rounded-2xl
+           border border-zinc-200 dark:border-zinc-700
+           bg-white dark:bg-zinc-900
+           p-6
+           shadow-sm">
 
-      </label>
+        <!-- 拖拽上传区域 -->
+        <label for="file-upload" class="flex flex-col items-center justify-center
+             w-full
+             rounded-xl
+             border-2 border-dashed
+             border-zinc-300 dark:border-zinc-600
+             p-8
+             cursor-pointer
+             transition
+             hover:border-indigo-500
+             hover:bg-indigo-50
+             dark:hover:bg-zinc-800" @dragover.prevent @drop.prevent="e => handleFiles(e.dataTransfer.files)">
 
-      <button @click="upload" :disabled="!files.length || uploading" class="mt-4 w-full sm:w-auto px-4 py-2 rounded-md
-         bg-indigo-600 text-white font-semibold shadow
-         hover:bg-indigo-500
-         disabled:opacity-50 disabled:cursor-not-allowed
-         transition">
-        上传文件
-      </button>
+          <svg class="mb-4 h-10 w-10 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor"
+            stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4h10v12m-5-5v8" />
+          </svg>
 
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">
+            点击或拖拽文件到此处上传
+          </p>
+          <p class="pt-1 text-xs text-zinc-400 dark:text-zinc-500">
+            支持图片 / 视频 / 音频 / 字体，最大 25MB
+          </p>
 
-      <!-- 已选择文件列表 -->
-      <div v-if="files.length" class="mt-4 space-y-2">
-        <div v-for="(f, index) in files" :key="f.name + f.size" class="flex items-center justify-between
-           rounded-lg border border-zinc-200 dark:border-zinc-700
-           bg-white dark:bg-zinc-800
-           px-3 py-2 text-sm">
-          <!-- 文件信息 -->
-          <div class="min-w-0">
-            <p class="truncate font-medium text-zinc-800 dark:text-zinc-100">
-              {{ f.name }}
-            </p>
-            <p class="text-xs text-zinc-500 dark:text-zinc-400">
-              {{ (f.size / 1024 / 1024).toFixed(2) }} MB
-            </p>
-          </div>
+          <input id="file-upload" type="file" multiple class="hidden" @change="e => handleFiles(e.target.files)" />
+        </label>
 
-          <!-- 删除按钮 -->
-          <button @click="removeFile(index)" class="ml-3 inline-flex items-center justify-center
-             rounded-md px-2 py-1
-             text-xs font-medium
-             text-red-600 dark:text-red-400
-             hover:bg-red-50 dark:hover:bg-red-900/20
-             transition" title="移除文件">
-            ✕
+        <!-- 操作区 -->
+        <div class="flex items-center justify-between pt-5">
+          <span class="text-xs text-zinc-500 dark:text-zinc-400">
+            已选择 {{ files.length }} 个文件
+          </span>
+
+          <button @click="upload" :disabled="!files.length || uploading" class="inline-flex items-center
+               rounded-md
+               px-3 py-1.5
+               text-sm font-medium
+               text-indigo-600
+               border border-indigo-300
+               hover:bg-indigo-50
+               disabled:opacity-40
+               disabled:cursor-not-allowed
+               transition">
+            上传文件
           </button>
         </div>
+
+        <!-- 已选择文件列表 -->
+        <div v-if="files.length" class="pt-2 space-y-2">
+          <div v-for="(f, index) in files" :key="f.name + f.size" style="margin-bottom: 10px;" class="flex items-center justify-between
+               rounded-lg
+               border border-zinc-200 dark:border-zinc-700
+               bg-zinc-50 dark:bg-zinc-800
+               px-3 py-2
+               text-sm">
+
+            <div class="min-w-0">
+              <p class="truncate font-medium">
+                {{ f.name }}
+              </p>
+              <p class="text-xs text-zinc-500">
+                {{ (f.size / 1024 / 1024).toFixed(2) }} MB
+              </p>
+            </div>
+
+            <button @click="removeFile(index)" class="ml-3
+                 rounded-md
+                 px-2 py-1
+                 text-xs
+                 text-red-600
+                 hover:bg-red-50
+                 dark:hover:bg-red-900/20
+                 transition">
+              ✕
+            </button>
+          </div>
+        </div>
+
       </div>
+    </section>
 
-
-    </div>
 
 
     <!-- 图片 -->
@@ -303,7 +321,7 @@ function showToast(text, duration = 2000) {
                  bg-white dark:bg-zinc-800 p-3 transition hover:shadow-lg">
           <img :src="item.url" @click.stop="previewImage = item.fullUrl" class="h-36 w-full object-contain rounded-md
                    bg-zinc-100 dark:bg-zinc-700" />
-          <div class="mt-2 truncate text-xs text-zinc-600 dark:text-zinc-400">
+          <div class="pt-2 truncate text-xs text-zinc-600 dark:text-zinc-400">
             {{ item.name }}
           </div>
         </div>
@@ -317,7 +335,7 @@ function showToast(text, duration = 2000) {
         <div v-for="item in resources.video" :key="item.name" @click="copyLink(item.fullUrl)" class="cursor-pointer rounded-xl border border-zinc-200 dark:border-zinc-700
                  bg-white dark:bg-zinc-800 p-3 transition hover:shadow-lg">
           <video :src="item.url" controls class="h-36 w-full object-contain rounded-md bg-black" />
-          <div class="mt-2 truncate text-xs text-zinc-600 dark:text-zinc-400">
+          <div class="pt-2 truncate text-xs text-zinc-600 dark:text-zinc-400">
             {{ item.name }}
           </div>
         </div>
@@ -357,7 +375,7 @@ function showToast(text, duration = 2000) {
       </div>
     </section>
   </div>
-  <footer class="mt-16 border-t border-zinc-200 dark:border-zinc-700
+  <footer class="border-t border-zinc-200 dark:border-zinc-700
          py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
     本站由
     <a href="https://edgeone.ai/zh?from=oss.nbcnm.cn" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-zinc-600 dark:text-zinc-300
@@ -386,7 +404,7 @@ function showToast(text, duration = 2000) {
         <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
           {{ uploading ? '正在上传文件…' : buildWaiting ? '文件已上传' : '文件已上传' }}
         </p>
-        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p class="pt-1 text-sm text-zinc-600 dark:text-zinc-400">
           {{ uploading ? '请勿关闭页面' : buildWaiting ? '正在重新编译资源，请等待约 20 秒' : '' }}
         </p>
 

@@ -1,3 +1,5 @@
+// 文件上传到 GitHub 仓库（分片上传 + Commit）
+
 // ===== 工具：ArrayBuffer → base64（Worker 安全）=====
 function arrayBufferToBase64(buffer) {
   let binary = ''
