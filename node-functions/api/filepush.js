@@ -160,7 +160,7 @@ export async function onRequest({ request, env }) {
     )
   }
 
-  // ================== 切片上传阶段（你原来的没问题） ==================
+  // ================== 切片上传阶段 ==================
   const formData = await request.formData()
   const sessionId = formData.get('sessionId')
   const fileId = formData.get('fileId')

@@ -14,6 +14,10 @@ const MAX_SIZE_MB = 25
 const uploading = ref(false)
 const buildWaiting = ref(false)
 
+// 预览图片
+const previewImage = ref(null)
+
+
 
 /**
  * 扫描 public/assets
@@ -61,12 +65,12 @@ const resources = computed(() => {
 
   return res
 })
-
+// 复制链接到剪贴板
 async function copyLink(url) {
   await navigator.clipboard.writeText(url)
-  alert('已复制资源链接')
+  showToast('✅ 已复制资源链接')
 }
-
+// 轮询构建状态
 async function pollBuildStatus() {
   buildWaiting.value = true
   uploading.value = false
@@ -88,7 +92,7 @@ async function pollBuildStatus() {
     }, 2000) // 每 2 秒轮询一次
   })
 }
-
+// 上传文件
 async function upload() {
   uploading.value = true
 
@@ -107,10 +111,7 @@ async function upload() {
   location.reload()
 }
 
-
-
-
-
+// 处理文件选择
 function handleFiles(fileList) {
   const incoming = Array.from(fileList)
 
@@ -137,12 +138,12 @@ function handleFiles(fileList) {
 
   files.value = Array.from(map.values())
 }
-
+// 移除文件
 function removeFile(index) {
   files.value.splice(index, 1)
 }
 
-
+// 上传单个文件（分片上传）
 async function uploadSingleFile(file) {
   const MAX_BODY_SIZE = 3 * 1024 * 1024
   const totalChunks = Math.ceil(file.size / MAX_BODY_SIZE)
@@ -177,6 +178,24 @@ async function uploadSingleFile(file) {
 // 给每个文件生成稳定 fileId
 function getFileId(file) {
   return `${file.name}_${file.size}_${file.lastModified}`
+}
+
+// Toast 提示
+const toast = ref({
+  show: false,
+  text: '',
+})
+
+let toastTimer = null
+
+function showToast(text, duration = 2000) {
+  toast.value.text = text
+  toast.value.show = true
+
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toast.value.show = false
+  }, duration)
 }
 
 
@@ -282,7 +301,7 @@ function getFileId(file) {
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <div v-for="item in resources.image" :key="item.name" @click="copyLink(item.fullUrl)" class="cursor-pointer rounded-xl border border-zinc-200 dark:border-zinc-700
                  bg-white dark:bg-zinc-800 p-3 transition hover:shadow-lg">
-          <img :src="item.url" class="h-36 w-full object-contain rounded-md
+          <img :src="item.url" @click.stop="previewImage = item.fullUrl" class="h-36 w-full object-contain rounded-md
                    bg-zinc-100 dark:bg-zinc-700" />
           <div class="mt-2 truncate text-xs text-zinc-600 dark:text-zinc-400">
             {{ item.name }}
@@ -374,5 +393,29 @@ function getFileId(file) {
       </div>
     </div>
   </div>
+
+  <!-- Toast 提示 -->
+  <div v-if="toast.show" class="fixed bottom-6 right-6 z-50
+         rounded-xl bg-zinc-900 text-white
+         px-4 py-2 text-sm shadow-lg
+         animate-fade-in">
+    {{ toast.text }}
+  </div>
+
+  <!-- 图片全屏预览 -->
+  <div v-if="previewImage" class="fixed inset-0 z-50
+         bg-black/80 backdrop-blur-sm
+         flex items-center justify-center" @click.self="previewImage = null">
+    <img :src="previewImage" class="max-w-[90vw] max-h-[90vh]
+           rounded-lg shadow-2xl" />
+
+    <!-- 关闭按钮 -->
+    <button class="absolute top-6 right-6
+           text-white text-2xl
+           hover:scale-110 transition" @click="previewImage = null">
+      ✕
+    </button>
+  </div>
+
 
 </template>
