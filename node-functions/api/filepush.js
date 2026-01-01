@@ -15,8 +15,7 @@ export async function onRequest({ request, env }) {
     return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400 })
   }
 
-  // 临时存储分片（Worker 内存或 KV）
-  // 这里示例用全局 Map（实际可用 KV / Durable Object 避免内存问题）
+  // 临时缓存分片
   if (!globalThis._uploadCache) globalThis._uploadCache = new Map()
   const arr = globalThis._uploadCache.get(name) || []
   arr[index] = content
@@ -57,5 +56,6 @@ export async function onRequest({ request, env }) {
     return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } })
   }
 
+  // 返回已接收的分片 index
   return new Response(JSON.stringify({ ok: true, index }), { headers: { 'Content-Type': 'application/json' } })
 }

@@ -90,16 +90,16 @@ async function upload() {
   uploading.value = true
   buildWaiting.value = true
 
-  const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB 每片
+  // 每片二进制大小 4.5MB → Base64 后 <6MB
+  const CHUNK_SIZE = 4.5 * 1024 * 1024 
   const totalChunks = Math.ceil(file.value.size / CHUNK_SIZE)
-
-  let uploadedChunks = 0
 
   for (let i = 0; i < totalChunks; i++) {
     const start = i * CHUNK_SIZE
     const end = Math.min(file.value.size, start + CHUNK_SIZE)
     const blob = file.value.slice(start, end)
 
+    // 转 Base64
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result.split(',')[1])
@@ -107,6 +107,7 @@ async function upload() {
       reader.readAsDataURL(blob)
     })
 
+    // 上传分片
     await fetch('/api/filepush', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -118,17 +119,17 @@ async function upload() {
       }),
     })
 
-    uploadedChunks++
-    console.log(`已上传 ${uploadedChunks}/${totalChunks} 片`)
+    console.log(`已上传 ${i + 1}/${totalChunks} 片`)
   }
 
-  // 所有分片上传完成 → 开始轮询编译状态
+  // 上传完 → 开始轮询编译状态
   await pollBuildStatus()
   buildWaiting.value = false
   uploading.value = false
   alert('资源编译完成！页面即将刷新')
   location.reload()
 }
+
 
 
 
