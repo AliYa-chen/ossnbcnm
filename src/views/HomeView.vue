@@ -22,6 +22,9 @@ const previewImage = ref(null)
 const stars = ref('—')
 
 onMounted(async () => {
+  // 预加载字体
+  resources.value.font.forEach(loadFont)
+  // 获取 GitHub Star 数
   try {
     const res = await fetch('/api/getstar')
     const data = await res.json()
@@ -211,6 +214,42 @@ function showToast(text, duration = 2000) {
 }
 
 
+// 字体加载管理
+
+const loadedFonts = new Set()
+
+function fontFamilyName(item) {
+  return `font_${item.name.replace(/\W+/g, '_')}`
+}
+
+function getFontFormat(url) {
+  if (url.endsWith('.woff2')) return 'woff2'
+  if (url.endsWith('.woff')) return 'woff'
+  if (url.endsWith('.otf')) return 'opentype'
+  if (url.endsWith('.ttf')) return 'truetype'
+  return ''
+}
+
+function loadFont(item) {
+  const family = fontFamilyName(item)
+  if (loadedFonts.has(family)) return
+
+  const format = getFontFormat(item.fullUrl)
+
+  const style = document.createElement('style')
+  style.textContent = `
+@font-face {
+  font-family: "${family}";
+  src: url("${item.fullUrl}") format("${format}");
+  font-display: swap;
+}
+`
+  document.head.appendChild(style)
+  loadedFonts.add(family)
+}
+
+
+
 </script>
 
 <template>
@@ -361,21 +400,45 @@ function showToast(text, duration = 2000) {
     <!-- 字体 -->
     <section v-if="resources.font.length" class="mb-10 pt-7">
       <h2 class="mb-4 text-xl font-semibold pb-3">🔤 字体</h2>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <div v-for="item in resources.font" :key="item.name" @click="copyLink(item.fullUrl)" class="cursor-pointer rounded-xl border border-zinc-200 dark:border-zinc-700
-                 bg-white dark:bg-zinc-800 p-4 transition hover:shadow-lg
-                 flex items-center justify-center h-36">
-          <div class="text-center">
-            <div class="text-2xl mb-2">🔠</div>
-            <div class="truncate text-xs font-mono text-zinc-600 dark:text-zinc-400">
-              {{ item.name }}
+        <div v-for="item in resources.font" :key="item.name" @click="copyLink(item.fullUrl)" class="cursor-pointer
+             rounded-xl
+             border border-zinc-200 dark:border-zinc-700
+             bg-white dark:bg-zinc-800
+             p-4
+             transition
+             hover:shadow-lg">
+
+          <!-- 字体示例 -->
+          <div class="h-24 flex flex-col items-center justify-center
+         text-lg leading-tight tracking-wide text-center" :style="{ fontFamily: fontFamilyName(item) }">
+            <div>Aa Bb Cc 123</div>
+            <div class="text-sm opacity-70">
+              The quick brown fox
             </div>
+            <div class="text-[10px] opacity-40 mt-1">
+              简中显示取决于字体是否支持
+            </div>
+            <div class="text-[10px] opacity-40 mt-1">
+              繁中顯示取決於字體是否支持
+            </div>
+          </div>
+
+
+
+          <!-- 文件名 -->
+          <div class="mt-2 truncate text-xs font-mono
+               text-zinc-600 dark:text-zinc-400
+               text-center">
+            {{ item.name }}
           </div>
         </div>
       </div>
     </section>
+
   </div>
-  <footer class="border-t border-zinc-200 dark:border-zinc-700
+  <footer class="flex justify-center items-center border-t border-zinc-200 dark:border-zinc-700
          py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
     本站由
     <a href="https://edgeone.ai/zh?from=oss.nbcnm.cn" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-zinc-600 dark:text-zinc-300
