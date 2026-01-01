@@ -6,6 +6,9 @@ This example demonstrates how EdgeOne Pages Functions work with GitHub's automat
 
 Live Demo: https://oss.nbcnm.cn
 
+
+[![Use EdgeOne Pages to deploy](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://edgeone.ai/pages/new?repository-url=https://github.com/AliYa-chen/EdgeOnePagesCOS)
+
 ## Getting Started
 
 First, run the development server:

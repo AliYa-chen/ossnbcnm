@@ -3,16 +3,17 @@ export async function onRequest({ request, env }) {
     return new Response('Method Not Allowed', { status: 405 })
   }
 
-  let body
+  // 获取文件（FormData 上传）
+  let file, name
   try {
-    body = await request.json()
-  } catch (e) {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 })
-  }
+    const formData = await request.formData()
+    const fileField = formData.get('file')
+    if (!fileField) throw new Error('No file uploaded')
 
-  const { name, content } = body
-  if (!name || !content) {
-    return new Response(JSON.stringify({ error: 'Missing name or content' }), { status: 400 })
+    file = await fileField.arrayBuffer() // ArrayBuffer
+    name = fileField.name
+  } catch (e) {
+    return new Response(JSON.stringify({ error: 'Invalid file upload', message: e.message }), { status: 400 })
   }
 
   const TYPES = {
@@ -28,20 +29,17 @@ export async function onRequest({ request, env }) {
   else if (TYPES.video.includes(ext)) folder = 'video'
   else if (TYPES.audio.includes(ext)) folder = 'music'
   else if (TYPES.font.includes(ext)) folder = 'font'
-  else {
-    return new Response(JSON.stringify({ error: 'File type not allowed' }), { status: 400 })
-  }
+  else return new Response(JSON.stringify({ error: 'File type not allowed' }), { status: 400 })
 
   const OWNER = env.OWNER
   const REPO = env.REPO
   const BRANCH = env.BRANCH
   const GITHUB_TOKEN = env.GITHUB_TOKEN
 
-  // 最终上传路径
   const path = `public/assets/${folder}/${name}`
   const api = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(path)}`
 
-  // 尝试获取 sha（文件存在就更新，不存在就创建）
+  // 获取 sha
   let sha
   const getRes = await fetch(`${api}?ref=${BRANCH}`, {
     headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
@@ -51,13 +49,23 @@ export async function onRequest({ request, env }) {
     sha = data.sha
   }
 
-  // 提交文件
+  // ArrayBuffer → Base64
+  const uint8 = new Uint8Array(file)
+  const CHUNK_SIZE = 0x8000
+  let base64 = ''
+  for (let i = 0; i < uint8.length; i += CHUNK_SIZE) {
+    const chunk = uint8.subarray(i, i + CHUNK_SIZE)
+    base64 += String.fromCharCode(...chunk)
+  }
+  base64 = btoa(base64)
+
+  // 上传到 GitHub
   const putRes = await fetch(api, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
     body: JSON.stringify({
       message: `upload ${path}`,
-      content,
+      content: base64,
       branch: BRANCH,
       ...(sha ? { sha } : {}),
     }),
