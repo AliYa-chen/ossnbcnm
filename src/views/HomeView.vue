@@ -85,9 +85,8 @@ async function pollBuildStatus() {
 }
 
 async function upload() {
-  if (!file.value) return alert('请选择文件')
-  if (file.value.size / 1024 / 1024 > MAX_SIZE_MB)
-    return alert(`文件过大，最大支持 ${MAX_SIZE_MB} MB`)
+  if (!file.value) return alert('请选择文件');
+  if (file.value.size / 1024 / 1024 > MAX_SIZE_MB) return alert(`文件过大，最大支持 ${MAX_SIZE_MB} MB`);
 
   uploading.value = true
   buildWaiting.value = false
