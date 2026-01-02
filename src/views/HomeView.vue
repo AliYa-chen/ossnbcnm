@@ -24,6 +24,8 @@ const stars = ref('—')
 onMounted(async () => {
   // 预加载字体
   resources.value.font.forEach(loadFont)
+  // 轮询构建状态
+  pollBuildStatus();
   // 获取 GitHub Star 数
   try {
     const res = await fetch('/api/getstar')
@@ -86,27 +88,31 @@ async function copyLink(url) {
   showToast('✅ 已复制资源链接')
 }
 // 轮询构建状态
-async function pollBuildStatus() {
-  buildWaiting.value = true
-  uploading.value = false
-  return new Promise((resolve, reject) => {
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetch('/api/getstatus', {
-          method: 'POST'
-        })
-        const data = await res.json()
+let buildTimer = null
 
-        if (data.usedInProd) {
-          clearInterval(timer)
-          resolve(true)
-        }
-      } catch (err) {
-        console.error('轮询失败', err)
+function pollBuildStatus() {
+  if (buildTimer) return // 防止重复启动
+
+  buildTimer = setInterval(async () => {
+    try {
+      const res = await fetch('/api/getstatus', { method: 'POST' })
+      const data = await res.json()
+
+      if (data.usedInProd) {
+        // 构建完成：关闭遮罩 + 停止轮询
+        buildWaiting.value = false
+        clearInterval(buildTimer)
+        buildTimer = null
+      } else {
+        // 正在构建：显示遮罩
+        buildWaiting.value = true
       }
-    }, 2000) // 每 2 秒轮询一次
-  })
+    } catch (err) {
+      console.error('轮询失败', err)
+    }
+  }, 2000)
 }
+
 // 上传文件
 async function upload() {
   uploading.value = true
@@ -122,7 +128,7 @@ async function upload() {
     body: JSON.stringify({ sessionId: uploadSessionId }),
   })
 
-  await pollBuildStatus()
+  pollBuildStatus()
   location.reload()
 }
 
@@ -465,10 +471,10 @@ function loadFont(item) {
 
       <div class="text-center">
         <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-          {{ uploading ? '正在上传文件…' : buildWaiting ? '文件已上传' : '文件已上传' }}
+          {{ uploading ? '正在上传文件…' : buildWaiting ? '资源正在构建中' : '' }}
         </p>
         <p class="pt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {{ uploading ? '请勿关闭页面' : buildWaiting ? '正在重新编译资源，请等待约 20 秒' : '' }}
+          {{ uploading ? '请勿关闭页面' : buildWaiting ? '正在重新编译资源，稍后自动刷新' : '' }}
         </p>
 
       </div>
